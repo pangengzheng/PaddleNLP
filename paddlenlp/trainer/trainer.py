@@ -1970,7 +1970,9 @@ class Trainer:
             param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys())
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
-
+        sharding_group = None
+        if self.args.use_hybrid_parallel and hasattr(self, sharding_group):
+            sharding_group = self.sharding_group
         if (
             not isinstance(self.model, PretrainedModel)
             and not isinstance(self.model, LoRAModel)
@@ -1984,7 +1986,7 @@ class Trainer:
                     is_main_process=self.args.should_save,
                     is_bf16=is_bf16,
                     param_names_in_master_weights=param_names_in_master_weights,
-                    sharding_group=self.sharding_group,
+                    sharding_group=sharding_group,
                     save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                     optimizer=self.optimizer,
                 )
@@ -1999,7 +2001,7 @@ class Trainer:
                     state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
                     if is_bf16:
                         logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
-                        state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, self.sharding_group)
+                        state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, sharding_group)
                         logger.info("after exclude state_dict len:{}".format(len(state_dict)))
                 paddle.save(
                     state_dict,
@@ -2013,7 +2015,7 @@ class Trainer:
                 is_main_process=self.args.should_save,
                 is_bf16=is_bf16,
                 param_names_in_master_weights=param_names_in_master_weights,
-                sharding_group=self.sharding_group,
+                sharding_group=sharding_group,
                 save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                 optimizer=self.optimizer,
                 sharding_degree=self.args.sharding_parallel_degree,
