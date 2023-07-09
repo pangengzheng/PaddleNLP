@@ -1893,7 +1893,7 @@ class Trainer:
         sharding_degree = 1
         vpp_degree = 1
         nranks = dist.get_world_size()
-        if nranks > 1:
+        if self.args.use_hybrid_parallel and nranks > 1:
             if dist.get_rank():
                 return
             hcg = fleet.get_hybrid_communicate_group()
@@ -1928,7 +1928,7 @@ class Trainer:
 
     def _save_sharding_meta(self, dir):
         nranks = dist.get_world_size()
-        if nranks <= 1:
+        if not self.args.use_hybrid_parallel or nranks <= 1:
             return
 
         hcg = fleet.get_hybrid_communicate_group()
@@ -1971,8 +1971,9 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         sharding_group = None
-        if self.args.use_hybrid_parallel and hasattr(self, sharding_group):
+        if self.args.use_hybrid_parallel and self.args.use_hybrid_parallel:
             sharding_group = self.sharding_group
+            sharding_rank = sharding_group.rank
         if (
             not isinstance(self.model, PretrainedModel)
             and not isinstance(self.model, LoRAModel)
@@ -1997,7 +1998,6 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 if self.args.save_sharding_stage1_model:
-                    sharding_rank = self.sharding_group.rank
                     state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
                     if is_bf16:
                         logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
